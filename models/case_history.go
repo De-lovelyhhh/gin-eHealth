@@ -46,8 +46,11 @@ func GetAllCase() (ch []CaseHistory) {
 	return ch
 }
 
-func GetCaseDetail(ch *CaseHistory) *CaseHistory {
-	res := db.Where("case_id = ?", ch.CaseId).Find(&ch)
+func GetCaseDetail(caseId int) *CaseHistory {
+	ch := &CaseHistory{
+		CaseId: caseId,
+	}
+	res := db.Where("case_id = ?", caseId).Find(&ch)
 	if res.Error != nil {
 		return nil
 	}
@@ -56,6 +59,14 @@ func GetCaseDetail(ch *CaseHistory) *CaseHistory {
 
 func PushCaseHistory(ch *CaseHistory) error {
 	res := db.Model(ch).Where("case_id = ?", ch.CaseId).Update(ch)
+	if res.Error != nil {
+		return res.Error
+	}
+	return nil
+}
+
+func PushCaseMap(chm map[string]interface{}, ch *CaseHistory) error {
+	res := db.Model(ch).Where("case_id = ?", ch.CaseId).Updates(chm)
 	if res.Error != nil {
 		return res.Error
 	}

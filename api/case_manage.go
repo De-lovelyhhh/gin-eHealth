@@ -39,6 +39,7 @@ func PushCase(c *gin.Context) {
 	fields := case_history.GetPrivateField(c.PostForm("case_id"))
 	// 敏感数据结构体
 	pch := &models.PrivateCaseHistory{}
+	pchm := make(map[string]interface{}, 0)
 	// 利用反射获取私密病历表中的字段
 	v := reflect.ValueOf(pch).Elem()
 	for i, val := range fields {
@@ -48,6 +49,7 @@ func PushCase(c *gin.Context) {
 		}
 		camel := camel(val)
 		// 将敏感数据存入结构体中，以便后面存入数据库
+		pchm[camel] = c.PostForm(val)
 		v.FieldByName(camel).SetString(c.PostForm(val))
 	}
 
@@ -73,7 +75,7 @@ func PushCase(c *gin.Context) {
 			chv.FieldByName(camel).SetString(postData)
 		}
 	}
-	case_history.PushCase(ch, pch)
+	case_history.PushCase(ch, pch, pchm)
 	c.JSON(http.StatusOK, gin.H{
 		"code": errorData.SUCCESS,
 	})
@@ -163,8 +165,12 @@ func GetFields(c *gin.Context) {
 
 func ChangeCasePrivateField(c *gin.Context) {
 	fields := c.Query("fields")
+	deleteData := c.QueryArray("deleteData[]")
+	newData := c.QueryArray("newData[]")
 	caseId, _ := strconv.Atoi(c.Query("caseId"))
+	cpm := models.GetPrivateByCaseId(caseId)
 	err := case_history.SetPrivateFields(fields, caseId)
+	case_history.UpdateCaseField(cpm.PrivateId, caseId, deleteData, newData)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"code": errorData.UNKNOWN_ERROR,

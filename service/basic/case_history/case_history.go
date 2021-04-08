@@ -2,6 +2,12 @@ package case_history
 
 import (
 	"e_healthy/models"
+	"e_healthy/pkg/util"
+
+	// "encoding/base64"
+	"fmt"
+	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -17,19 +23,17 @@ func GetCaseDetail(caseId int, account string, identity int) (*models.CaseHistor
 	if res == nil {
 		return nil, nil
 	}
-	ch := &models.CaseHistory{
-		CaseId: caseId,
-	}
+
 	if identity == 1 && res.PatientAccount == account {
-		return models.GetCaseDetail(ch), models.GetPrivateData(res.PrivateId)
+		return models.GetCaseDetail(caseId), models.GetPrivateData(res.PrivateId)
 	} else if identity != 1 {
 		isTrue := models.FindRecord(res.PrivateId, account)
 		if isTrue {
-			return models.GetCaseDetail(ch), models.GetPrivateData(res.PrivateId)
+			return models.GetCaseDetail(caseId), models.GetPrivateData(res.PrivateId)
 		}
 	}
 
-	return models.GetCaseDetail(ch), nil
+	return models.GetCaseDetail(caseId), nil
 }
 
 type CompleteCase struct {
@@ -54,7 +58,7 @@ func GetPrivateField(caseId string) []string {
 	return strings.Split(models.GetPrivateField(caseId), ";")
 }
 
-func PushCase(ch *models.CaseHistory, pch *models.PrivateCaseHistory) {
+func PushCase(ch *models.CaseHistory, pch *models.PrivateCaseHistory, pchm map[string]interface{}) {
 	models.PushCaseHistory(ch)
 	// 获取私密病历ID
 	cpm := models.GetPrivateByCaseId(ch.CaseId)
@@ -76,4 +80,62 @@ func SetPrivateFields(fields string, caseId int) error {
 
 func GetModel(caseId int) *models.CasePrivateMap {
 	return models.GetPrivateByCaseId(caseId)
+}
+
+// 更新私密病历时联动更新两个表
+func UpdateCaseField(priId int, caseId int, deleteData []string, newData []string) error {
+	// var aeskey = []byte("321423u9y8d2fwfl")
+	ch := models.GetCaseDetail(caseId)
+	vCh := reflect.ValueOf(ch).Elem()
+	chm := make(map[string]interface{}, 0)
+
+	pch := models.GetPrivateData(priId)
+	vPch := reflect.ValueOf(pch).Elem()
+	pchm := make(map[string]interface{}, 0)
+
+	for _, val := range newData {
+		camel := util.Camel(val)
+		var dataStr string
+		var dataInt int
+		switch vCh.FieldByName(camel).Type().String() {
+		case "int":
+			dataInt = int(vCh.FieldByName(camel).Int())
+			data := strconv.Itoa(dataInt)
+			pchm[camel] = data
+			vPch.FieldByName(camel).SetString(data)
+			chm[camel] = 0
+		case "string":
+			dataStr = vCh.FieldByName(camel).String()
+			pchm[camel] = dataStr
+			vPch.FieldByName(camel).SetString(dataStr)
+			chm[camel] = ""
+		}
+	}
+
+	for _, val := range deleteData {
+		camel := util.Camel(val)
+		if data := vPch.FieldByName(camel).String(); data != "" {
+			fmt.Print(data)
+			switch vCh.FieldByName(camel).Type().String() {
+			case "int":
+				chm[camel] = toInt(data)
+			case "string":
+				chm[camel] = data
+			}
+			pchm[camel] = ""
+			vPch.FieldByName(camel).SetString("")
+			// outPriData[camel] = string(tpass)
+		}
+	}
+
+	if err := models.SetEncrypt(pch); err != nil {
+		return err
+	}
+	models.PushCaseMap(chm, ch)
+	return nil
+}
+
+func toInt(str string) int64 {
+	res, _ := strconv.ParseInt(str, 10, 64)
+	return res
 }
