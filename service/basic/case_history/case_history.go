@@ -37,8 +37,8 @@ func GetCaseDetail(caseId int, account string, identity int) (*models.CaseHistor
 }
 
 type CompleteCase struct {
-	*models.CaseHistory
-	*models.PrivateCaseHistory
+	CaseHistory        *models.CaseHistory
+	PrivateCaseHistory *models.PrivateCaseHistory
 }
 
 func GetMyCaseList(userAccount string, identity int) []*CompleteCase {
@@ -47,8 +47,8 @@ func GetMyCaseList(userAccount string, identity int) []*CompleteCase {
 	for _, v := range privateList {
 		newCh, newPch := GetCaseDetail(v.CaseId, userAccount, identity)
 		ch = append(ch, &CompleteCase{
-			newCh,
-			newPch,
+			CaseHistory:        newCh,
+			PrivateCaseHistory: newPch,
 		})
 	}
 	return ch

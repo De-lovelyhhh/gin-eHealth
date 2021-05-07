@@ -75,6 +75,14 @@ func Signin(c *gin.Context) {
 	}
 
 	statusCode, errorCode := accountService.Signin()
+	if errorCode == 0 {
+		token := generateToken(c, form)
+		c.JSON(statusCode, gin.H{
+			"code":  errorCode,
+			"token": token,
+		})
+		return
+	}
 	c.JSON(statusCode, gin.H{
 		"code": errorCode,
 	})
